@@ -1,0 +1,80 @@
+---
+title: "Exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database"
+output: html_document
+---
+
+```{r echo=FALSE}
+library(tidyverse)
+stormdata_file_path <-"repdata%2Fdata%2FStormData.csv.bz2"
+#stormdata_file_path <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+stormdata <- read_csv(stormdata_file_path)
+
+```
+
+## Synopsis
+  Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern.
+
+This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+  
+
+## Data Processing
+
+```{r pressure}
+
+## 1 - Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
+
+grouped_events <- stormdata %>% 
+          group_by(EVTYPE)
+
+events_most_harmful <- grouped_events  %>% 
+          summarise(FATALITIES = sum(FATALITIES), INJURIES = sum(INJURIES)) %>%
+          arrange(desc(INJURIES + FATALITIES))
+
+## 2 - Across the United States, which types of events have the greatest economic consequences?
+
+grouped_events$propFactor<-factor(grouped_events$PROPDMGEXP,levels=c("H","K","M","B","h","m","O"))
+grouped_events$propFactor[is.na(grouped_events$propFactor)] <- "O"
+grouped_events$cropFactor<-factor(grouped_events$CROPDMGEXP,levels=c("K","M","B","k","m","O"))
+grouped_events$cropFactor[is.na(grouped_events$cropFactor)] <- "O"
+
+grouped_events <- grouped_events %>% mutate(PROP= 0, CROP=0)
+
+grouped_events$PROP[grouped_events$propFactor=="K"]<-1000
+grouped_events$PROP[grouped_events$propFactor=="H"|grouped_events$propFactor=="h"]<-100
+grouped_events$PROP[grouped_events$propFactor=="M"|grouped_events$propFactor=="m"]<-1e6
+grouped_events$PROP[grouped_events$propFactor=="B"]<-1e9
+grouped_events$PROP[grouped_events$propFactor=="O"]<-1
+
+grouped_events$CROP[grouped_events$cropFactor=="K"|grouped_events$cropFactor=="k"]<-1000
+grouped_events$CROP[grouped_events$cropFactor=="M"|grouped_events$cropFactor=="m"]<-1e6
+grouped_events$CROP[grouped_events$cropFactor=="B"]<-1e9
+grouped_events$CROP[grouped_events$cropFactor=="O"]<-1
+
+
+grouped_events <- grouped_events %>% mutate(PROPdmgVal= PROPDMG*PROP/1e6, CROPdmgVal=CROPDMG*CROP/1e6)
+
+#t2<-aggregate(cbind(PROPdmgVal,CROPdmgVal) ~ EVTYPE, data = t, sum, na.rm=TRUE)
+events_economic_consequences <- grouped_events %>%
+     summarize(PROPdmgVal=sum(PROPdmgVal,na.rm=TRUE),CROPdmgVal=sum(CROPdmgVal,na.rm=TRUE))
+events_economic_consequences<-arrange(events_economic_consequences,desc(PROPdmgVal+CROPdmgVal))
+events_economic_consequences<-events_economic_consequences[1:10,]
+```
+
+## Results
+```{r}
+
+A2 <- head(events_most_harmful, 10)
+
+library(reshape2)
+A3 <- melt(A2, id.var="EVTYPE")
+ggplot(A3, aes(x = reorder(EVTYPE, value, sum), y = value, fill = variable)) + 
+   coord_flip() +
+# theme(legend.position = "top") 
+  geom_bar(stat = "identity") + labs(title = expression("Disaster Casualties"))
+
+A4 <- melt(events_economic_consequences, id.var="EVTYPE")
+ggplot(A4, aes(x = reorder(EVTYPE, value, sum), y = value, fill = variable)) + 
+  coord_flip() + 
+# theme(legend.position = "top") 
+  geom_bar(stat = "identity") + xlab("Storm Type") + ylab("Damage Million") + labs(title = expression("Disaster Economic Impact"))
+```
