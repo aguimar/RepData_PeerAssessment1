@@ -3,7 +3,7 @@ title: "Exploring the U.S. National Oceanic and Atmospheric Administration's (NO
 output: html_document
 ---
 
-```{r echo=FALSE}
+```{r}
 library(tidyverse)
 stormdata_file_path <-"repdata%2Fdata%2FStormData.csv.bz2"
 #stormdata_file_path <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
@@ -19,19 +19,23 @@ This project involves exploring the U.S. National Oceanic and Atmospheric Admini
 
 ## Data Processing
 
-```{r pressure}
+#### 1 - Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
 
-## 1 - Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
-
+```{r question1}
+# simple group tbl by EVTYPE
 grouped_events <- stormdata %>% 
           group_by(EVTYPE)
 
 events_most_harmful <- grouped_events  %>% 
           summarise(FATALITIES = sum(FATALITIES), INJURIES = sum(INJURIES)) %>%
           arrange(desc(INJURIES + FATALITIES))
+```
 
-## 2 - Across the United States, which types of events have the greatest economic consequences?
+#### 2 - Across the United States, which types of events have the greatest economic consequences?
 
+
+```{r question2}
+# I have to factor magnitude letters
 grouped_events$propFactor<-factor(grouped_events$PROPDMGEXP,levels=c("H","K","M","B","h","m","O"))
 grouped_events$propFactor[is.na(grouped_events$propFactor)] <- "O"
 grouped_events$cropFactor<-factor(grouped_events$CROPDMGEXP,levels=c("K","M","B","k","m","O"))
@@ -53,7 +57,7 @@ grouped_events$CROP[grouped_events$cropFactor=="O"]<-1
 
 grouped_events <- grouped_events %>% mutate(PROPdmgVal= PROPDMG*PROP/1e6, CROPdmgVal=CROPDMG*CROP/1e6)
 
-#t2<-aggregate(cbind(PROPdmgVal,CROPdmgVal) ~ EVTYPE, data = t, sum, na.rm=TRUE)
+# Sum it product of PROPdmg and CROPdmg by EVTYPE
 events_economic_consequences <- grouped_events %>%
      summarize(PROPdmgVal=sum(PROPdmgVal,na.rm=TRUE),CROPdmgVal=sum(CROPdmgVal,na.rm=TRUE))
 events_economic_consequences<-arrange(events_economic_consequences,desc(PROPdmgVal+CROPdmgVal))
@@ -69,8 +73,7 @@ library(reshape2)
 A3 <- melt(A2, id.var="EVTYPE")
 ggplot(A3, aes(x = reorder(EVTYPE, value, sum), y = value, fill = variable)) + 
    coord_flip() +
-# theme(legend.position = "top") 
-  geom_bar(stat = "identity") + labs(title = expression("Disaster Casualties"))
+  geom_bar(stat = "identity") + xlab("Storm Type") + ylab("Casualties") + labs(title = expression("Disaster Casualties"))
 
 A4 <- melt(events_economic_consequences, id.var="EVTYPE")
 ggplot(A4, aes(x = reorder(EVTYPE, value, sum), y = value, fill = variable)) + 
